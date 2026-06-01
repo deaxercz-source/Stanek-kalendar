@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="cs" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stanek Kalendar</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===== THEME ===== */
+[data-theme="light"]{
+  --bg:#f5f3ef;--surface:#fff;--surface2:#f0ede8;--border:#e0dbd4;
+  --text:#1a1a1a;--text2:#666;--text3:#aaa;
+  --green:#2e9e6b;--red:#d94f4f;--amber:#c97b00;
+  --shadow:0 2px 12px rgba(0,0,0,.07);
+}
+[data-theme="dark"]{
+  --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#333;
+  --text:#f0ede8;--text2:#999;--text3:#555;
+  --green:#4caf80;--red:#e05555;--amber:#f0c040;
+  --shadow:0 2px 12px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;min-height:100vh;transition:background .2s,color .2s;}
+
+/* ===== PICKER ===== */
+.picker{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;}
+.picker-logo{font-size:38px;font-weight:900;margin-bottom:6px;}
+.picker-sub{color:var(--text2);font-size:16px;margin-bottom:44px;}
+.picker-cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;}
+.picker-card{width:160px;padding:28px 16px 24px;background:var(--surface);border:2px solid var(--border);border-radius:18px;cursor:pointer;text-align:center;transition:all .18s;box-shadow:var(--shadow);}
+.picker-card:hover{transform:translateY(-5px);box-shadow:0 8px 24px rgba(0,0,0,.12);}
+.picker-avatar{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:#fff;margin:0 auto 14px;}
+.picker-name{font-size:20px;font-weight:800;}
+.theme-toggle-picker{position:fixed;top:16px;right:16px;background:var(--surface);border:2px solid var(--border);border-radius:999px;padding:8px 14px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text2);}
+
+/* ===== APP ===== */
+.app{display:flex;min-height:100vh;}
+
+/* ===== SIDEBAR ===== */
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;z-index:50;}
+.sidebar-logo{font-size:18px;font-weight:900;padding:0 6px 16px;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.sidebar-logo span{display:block;font-size:12px;font-weight:400;color:var(--text2);margin-top:2px;}
+.user-pill{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:16px;border:2px solid var(--border);background:var(--surface2);}
+.user-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;flex-shrink:0;}
+.user-name{font-weight:700;font-size:14px;}
+.user-switch{font-size:11px;color:var(--text3);cursor:pointer;margin-top:1px;}
+.user-switch:hover{color:var(--text2);}
+.nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border-radius:10px;border:none;background:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--text2);transition:all .13s;text-align:left;margin-bottom:3px;}
+.nav-btn:hover{background:var(--surface2);color:var(--text);}
+.nav-btn.active{background:var(--uc,#e67e22);color:#fff;}
+.nav-icon{font-size:17px;width:22px;text-align:center;}
+.sidebar-bottom{margin-top:auto;padding-top:16px;border-top:1px solid var(--border);}
+.theme-btn{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:10px;border:none;background:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--text2);}
+.theme-btn:hover{background:var(--surface2);color:var(--text);}
+
+/* ===== MOBILE NAV ===== */
+.mobile-header{display:none;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:60;}
+.mobile-logo{font-size:17px;font-weight:900;}
+.mobile-menu-btn{background:none;border:none;cursor:pointer;font-size:22px;color:var(--text);padding:4px;}
+.mobile-nav{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:70;}
+.mobile-nav.open{display:block;}
+.mobile-nav-panel{position:absolute;left:0;top:0;bottom:0;width:240px;background:var(--surface);padding:20px 14px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;}
+.mobile-nav-close{background:none;border:none;cursor:pointer;font-size:22px;color:var(--text);margin-bottom:12px;padding:4px;}
+
+/* ===== MAIN ===== */
+.main{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
+.page{display:none;}.page.active{display:block;}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;}
+.page-title{font-size:26px;font-weight:900;}
+.page-sub{color:var(--text2);font-size:13px;margin-top:3px;}
+
+/* ===== BUTTONS ===== */
+.btn{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;transition:all .13s;display:inline-flex;align-items:center;gap:7px;}
+.btn-primary{background:var(--uc,#e67e22);color:#fff;}.btn-primary:hover{filter:brightness(.92);}
+.btn-ghost{background:var(--surface2);color:var(--text2);border:2px solid var(--border);}.btn-ghost:hover{border-color:#aaa;color:var(--text);}
+.btn-danger{background:transparent;color:var(--red);border:2px solid var(--red);}.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px;}
+.btn-big{padding:12px 22px;font-size:15px;}
+
+/* ===== STATS PAGE ===== */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;}
+.stat-big{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);}
+.stat-big-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;}
+.stat-big-val{font-size:28px;font-weight:900;}
+.stat-big-val.green{color:var(--green);}
+.stat-big-val.amber{color:var(--amber);}
+.stat-big-val.red{color:var(--red);}
+.chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.chart-title{font-size:15px;font-weight:800;margin-bottom:16px;}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.bar-label{font-size:12px;font-weight:600;color:var(--text2);width:36px;text-align:right;flex-shrink:0;}
+.bar-track{flex:1;background:var(--surface2);border-radius:6px;height:24px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:700;color:#fff;transition:width .4s;}
+.top-list{display:flex;flex-direction:column;gap:8px;}
+.top-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-radius:10px;}
+.top-item-name{font-weight:700;font-size:14px;}
+.top-item-val{font-weight:800;font-size:15px;}
+
+/* ===== CALENDAR STATS ===== */
+.cal-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.cal-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);}
+.cal-stat-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;}
+.cal-stat-val{font-size:22px;font-weight:900;}
+.cal-stat-val.green{color:var(--green);}
+.cal-stat-val.amber{color:var(--amber);}
+
+/* ===== CALENDAR ===== */
+.cal-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.cal-month{font-size:20px;font-weight:900;min-width:180px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;width:100%;}
+.cal-day-name{text-align:center;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;padding:6px 0;letter-spacing:.5px;}
+.cal-day{min-height:90px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;transition:border-color .13s;}
+.cal-day:hover{border-color:#aaa;}
+.cal-day.empty{background:transparent;border-color:transparent;cursor:default;}
+.cal-day.today{border:2px solid var(--uc,#e67e22);}
+.cal-day.has-event{border-left:4px solid var(--amber);}
+.cal-day.has-income{border-left:4px solid var(--green);}
+.cal-day-num{font-size:16px;font-weight:900;color:var(--text2);line-height:1;margin-bottom:5px;}
+.cal-day.today .cal-day-num{color:var(--uc,#e67e22);}
+.cal-dot{font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;padding:2px 5px;border-radius:4px;font-weight:600;}
+.cal-dot.ev{color:#7a4800;background:#fef0c0;}
+.cal-dot.inc{color:#1a6b45;background:#e2f4ec;}
+.cal-dot.plain{font-size:10px;font-weight:600;color:var(--text2);}
+/* WHO IS WHERE dots */
+.who-dots{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px;}
+.who-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* ===== CARDS ===== */
+.item-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:12px;box-shadow:var(--shadow);transition:border-color .13s;}
+.item-card:hover{border-color:#bbb;}
+.item-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.item-card-title{font-size:17px;font-weight:800;}
+.item-card-actions{display:flex;gap:6px;flex-shrink:0;}
+.item-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;}
+.item-tag{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text2);background:var(--surface2);padding:5px 10px;border-radius:8px;font-weight:500;}
+.item-note{font-size:13px;color:var(--text2);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+
+/* ===== BADGES ===== */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+.badge-green{background:#e2f4ec;color:var(--green);}
+.badge-amber{background:#fef5e0;color:var(--amber);}
+.badge-red{background:#fdeaea;color:var(--red);}
+.badge-blue{background:#e8f0fe;color:#2060c0;}
+.badge-gray{background:var(--surface2);color:var(--text2);}
+
+/* ===== TASKS / LEADS ===== */
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:9px;display:flex;align-items:flex-start;gap:12px;box-shadow:var(--shadow);}
+.task-card.done{opacity:.45;}
+.task-check{width:24px;height:24px;border-radius:50%;border:2.5px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .13s;margin-top:1px;font-size:12px;}
+.task-check:hover{border-color:var(--uc,#e67e22);}
+.task-check.checked{background:var(--green);border-color:var(--green);color:#fff;}
+.task-body{flex:1;min-width:0;}
+.task-text{font-size:15px;font-weight:600;}
+.task-card.done .task-text{text-decoration:line-through;color:var(--text3);}
+.task-meta{font-size:12px;color:var(--text3);margin-top:3px;}
+.prio-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:6px;}
+.prio-high{background:var(--red);}.prio-mid{background:var(--amber);}.prio-low{background:var(--text3);}
+
+/* ===== WEATHER ===== */
+.wx-block{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface2);border-radius:10px;margin-top:10px;flex-wrap:wrap;}
+.wx-icon{font-size:28px;flex-shrink:0;}
+.wx-desc{font-size:14px;font-weight:700;}
+.wx-detail{font-size:12px;color:var(--text2);margin-top:2px;}
+.wx-warn{font-size:12px;color:var(--red);font-weight:700;margin-top:3px;}
+.wx-loading{font-size:12px;color:var(--text3);padding:8px 0;}
+
+/* ===== MODAL ===== */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:18px;padding:28px;width:500px;max-width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.2);}
+.modal-title{font-size:20px;font-weight:900;margin-bottom:20px;}
+
+/* ===== FORMS ===== */
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.4px;}
+.form-input,.form-textarea,.form-select{width:100%;background:var(--surface2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:10px 13px;transition:border-color .13s;outline:none;}
+.form-input:focus,.form-textarea:focus,.form-select:focus{border-color:var(--uc,#e67e22);}
+.form-textarea{resize:vertical;min-height:76px;}
+.form-select option{background:var(--surface);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+
+/* ===== SEARCH ===== */
+.search-wrap{position:relative;margin-bottom:18px;}
+.search-input{width:100%;padding:11px 14px 11px 42px;border:2px solid var(--border);border-radius:11px;font-family:'Inter',sans-serif;font-size:14px;background:var(--surface);color:var(--text);outline:none;transition:border-color .13s;}
+.search-input:focus{border-color:var(--uc,#e67e22);}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3);pointer-events:none;}
+
+/* ===== FILTER TABS ===== */
+.filter-tabs{display:flex;gap:5px;margin-bottom:18px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:4px;}
+.filter-tab{flex:1;padding:8px;border-radius:8px;border:none;background:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--text2);transition:all .13s;}
+.filter-tab.active{background:var(--uc,#e67e22);color:#fff;}
+
+/* ===== EMPTY ===== */
+.empty{text-align:center;padding:50px 20px;color:var(--text3);}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+.empty-text{font-size:15px;}
+
+/* ===== SYNC ===== */
+.sync-pill{position:fixed;bottom:14px;right:14px;background:var(--surface);border:2px solid var(--border);border-radius:999px;padding:7px 14px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:7px;z-index:100;box-shadow:var(--shadow);}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);}
+.sync-dot.on{background:var(--green);}
+.sync-dot.pulse{background:var(--amber);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ===== SETUP ===== */
+.setup-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.setup-box{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:36px;width:540px;max-width:100%;box-shadow:var(--shadow);}
+.setup-title{font-size:24px;font-weight:900;margin-bottom:6px;}
+.setup-sub{color:var(--text2);font-size:13px;margin-bottom:22px;line-height:1.7;}
+.setup-step-title{font-weight:800;font-size:13px;margin-bottom:5px;margin-top:16px;display:flex;align-items:center;gap:7px;}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--text);color:var(--bg);font-size:11px;font-weight:800;flex-shrink:0;}
+.setup-desc{font-size:13px;color:var(--text2);line-height:1.6;}
+.setup-link{color:var(--amber);text-decoration:none;font-weight:700;}
+hr.sep{border:none;border-top:2px solid var(--border);margin:20px 0;}
+
+/* ===== MOBILE ===== */
+@media(max-width:700px){
+  .sidebar{display:none;}
+  .mobile-header{display:flex;}
+  .main{padding:16px;}
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  .cal-stats{grid-template-columns:1fr 1fr;}
+  .form-row{grid-template-columns:1fr;}
+  .page-header{flex-direction:column;gap:10px;}
+  .page-header .btn-big{width:100%;justify-content:center;}
+  .cal-day{min-height:56px;padding:5px;}
+  .cal-day-num{font-size:13px;}
+  .cal-dot{font-size:9px;padding:1px 3px;}
+  .modal{padding:20px;}
+  .stats-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setupScreen" class="setup-wrap" style="display:none">
+  <div class="setup-box">
+    <div class="setup-title">Pripojit Firebase</div>
+    <div class="setup-sub">Firebase zajisti synchronizaci dat mezi vsemi zarizeni. Staci nastavit jednou.</div>
+    <div class="setup-step-title"><span class="step-num">1</span> Vytvor projekt</div>
+    <div class="setup-desc">Jdi na <a href="https://console.firebase.google.com" target="_blank" class="setup-link">console.firebase.google.com</a>, klikni Pridat projekt, nazvi ho stanek-kalendar, vypni Analytics.</div>
+    <div class="setup-step-title"><span class="step-num">2</span> Zapni Realtime Database</div>
+    <div class="setup-desc">Levy panel: Build &rarr; Realtime Database &rarr; Create database &rarr; europe-west1 &rarr; Start in test mode</div>
+    <div class="setup-step-title"><span class="step-num">3</span> Zkopiruj udaje</div>
+    <div class="setup-desc">Project Settings (ozubene kolecko) &rarr; General &rarr; Add app &rarr; Web &rarr; zkopiruj hodnoty:</div>
+    <div class="form-row" style="margin:12px 0 10px">
+      <div class="form-group" style="margin:0"><label class="form-label">API Key</label><input class="form-input" id="cfg-apiKey" placeholder="AIza..."></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Auth Domain</label><input class="form-input" id="cfg-authDomain" placeholder="xxx.firebaseapp.com"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:12px">
+      <div class="form-group" style="margin:0"><label class="form-label">Database URL</label><input class="form-input" id="cfg-dbUrl" placeholder="https://xxx.europe-west1.firebasedatabase.app"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Project ID</label><input class="form-input" id="cfg-projectId" placeholder="stanek-kalendar-xxx"></div>
+    </div>
+    <hr class="sep">
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-big" style="background:var(--text);color:var(--bg)" onclick="saveConfig()">Pripojit a spustit</button>
+      <button class="btn btn-ghost" onclick="startDemo()">Vyzkouset bez Firebase</button>
+    </div>
+    <p id="setup-error" style="color:var(--red);font-size:13px;margin-top:10px;display:none"></p>
+  </div>
+</div>
+
+<!-- PICKER -->
+<div id="pickerScreen" class="picker" style="display:none">
+  <button class="theme-toggle-picker" onclick="toggleTheme()">🌙 / ☀️</button>
+  <div class="picker-logo">🎪 Stanek Kalendar</div>
+  <div class="picker-sub">Kdo dnes pouziva appku?</div>
+  <div class="picker-cards">
+    <div class="picker-card" onclick="selectUser('tatka','Tatka','#e67e22')">
+      <div class="picker-avatar" style="background:#e67e22">T</div>
+      <div class="picker-name">Tatka</div>
+    </div>
+    <div class="picker-card" onclick="selectUser('david','David','#2980b9')">
+      <div class="picker-avatar" style="background:#2980b9">D</div>
+      <div class="picker-name">David</div>
+    </div>
+    <div class="picker-card" onclick="selectUser('pepa','Pepa','#27ae60')">
+      <div class="picker-avatar" style="background:#27ae60">P</div>
+      <div class="picker-name">Pepa</div>
+    </div>
+    <div class="picker-card" onclick="selectUser('veronika','Veronika','#9b59b6')">
+      <div class="picker-avatar" style="background:#9b59b6">V</div>
+      <div class="picker-name">Veronika</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="mainApp" class="app" style="display:none">
+
+  <!-- MOBILE HEADER -->
+  <div class="mobile-header">
+    <div class="mobile-logo">🎪 Stanek</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="theme-btn" onclick="toggleTheme()" style="padding:6px">🌙</button>
+      <button class="mobile-menu-btn" onclick="openMobileMenu()">☰</button>
+    </div>
+  </div>
+
+  <!-- MOBILE NAV -->
+  <div class="mobile-nav" id="mobileNav" onclick="closeMobileMenu()">
+    <div class="mobile-nav-panel" onclick="event.stopPropagation()">
+      <button class="mobile-nav-close" onclick="closeMobileMenu()">✕</button>
+      <div class="user-pill" id="mobileUserPill">
+        <div class="user-av" id="mobileUserAv"></div>
+        <div>
+          <div class="user-name" id="mobileUserName"></div>
+          <div class="user-switch" onclick="switchUser()">← zmenit</div>
+        </div>
+      </div>
+      <button class="nav-btn" onclick="showPage('stats',this);closeMobileMenu()"><span class="nav-icon">📊</span>Statistiky</button>
+      <button class="nav-btn active" onclick="showPage('calendar',this);closeMobileMenu()"><span class="nav-icon">📅</span>Kalendar</button>
+      <button class="nav-btn" onclick="showPage('journal',this);closeMobileMenu()"><span class="nav-icon">💰</span>Vydelky</button>
+      <button class="nav-btn" onclick="showPage('events',this);closeMobileMenu()"><span class="nav-icon">📍</span>Akce</button>
+      <button class="nav-btn" onclick="showPage('leads',this);closeMobileMenu()"><span class="nav-icon">🤝</span>Domlouvani akci</button>
+      <button class="nav-btn" onclick="showPage('organizers',this);closeMobileMenu()"><span class="nav-icon">👥</span>Poradatele</button>
+      <button class="theme-btn" onclick="toggleTheme()"><span class="nav-icon">🌙</span>Tmave / Svetle</button>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">🎪 Stanek<span>Sprava stanku</span></div>
+    <div class="user-pill">
+      <div class="user-av" id="userAv"></div>
+      <div>
+        <div class="user-name" id="userPillName"></div>
+        <div class="user-switch" onclick="switchUser()">← zmenit</div>
+      </div>
+    </div>
+    <button class="nav-btn" id="nb-stats" onclick="showPage('stats',this)"><span class="nav-icon">📊</span>Statistiky</button>
+    <button class="nav-btn active" id="nb-calendar" onclick="showPage('calendar',this)"><span class="nav-icon">📅</span>Kalendar</button>
+    <button class="nav-btn" id="nb-journal" onclick="showPage('journal',this)"><span class="nav-icon">💰</span>Vydelky</button>
+    <button class="nav-btn" id="nb-events" onclick="showPage('events',this)"><span class="nav-icon">📍</span>Akce</button>
+    <button class="nav-btn" id="nb-leads" onclick="showPage('leads',this)"><span class="nav-icon">🤝</span>Domlouvani akci</button>
+    <button class="nav-btn" id="nb-organizers" onclick="showPage('organizers',this)"><span class="nav-icon">👥</span>Poradatele</button>
+    <div class="sidebar-bottom">
+      <button class="theme-btn" onclick="toggleTheme()"><span class="nav-icon">🌙</span>Tmave / Svetle</button>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- STATS -->
+    <div id="page-stats" class="page">
+      <div class="page-header">
+        <div><div class="page-title">📊 Statistiky</div><div class="page-sub" id="statsSub"></div></div>
+        <div style="display:flex;gap:8px;align-items:center"><select class="form-select" style="width:auto;padding:8px 12px" id="statsYear" onchange="renderStats()"></select><button class="btn btn-ghost btn-sm" id="allUsersBtn" onclick="toggleAllUsers()">Vsichni dohromady</button></div>
+      </div>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="chart-wrap" id="allUsersWrap" style="display:none">
+        <div class="chart-title">Vsichni dohromady — porovnani</div>
+        <div id="allUsersChart"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">Trzba po mesicich</div>
+        <div id="monthChart"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="chart-wrap">
+          <div class="chart-title">Top mista</div>
+          <div class="top-list" id="topPlaces"></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">Nejlepsi dny</div>
+          <div class="top-list" id="topDays"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div id="page-calendar" class="page active">
+      <div class="page-header">
+        <div><div class="page-title">📅 Kalendar</div><div class="page-sub" id="calSub"></div></div>
+        <div class="cal-header" style="margin:0">
+          <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)">← zpet</button>
+          <span class="cal-month" id="calMonthLabel"></span>
+          <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)">dal →</button>
+        </div>
+      </div>
+      <div class="cal-stats">
+        <div class="cal-stat"><div class="cal-stat-label">Akce</div><div class="cal-stat-val amber" id="statEvents">0</div></div>
+        <div class="cal-stat"><div class="cal-stat-label">Trzba</div><div class="cal-stat-val green" id="statIncome">0 Kc</div></div>
+        <div class="cal-stat"><div class="cal-stat-label">Nejblizsi</div><div class="cal-stat-val" id="statNext" style="font-size:14px;padding-top:4px">—</div></div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+
+    </div>
+
+    <!-- JOURNAL -->
+    <div id="page-journal" class="page">
+      <div class="page-header">
+        <div><div class="page-title">💰 Vydelky</div><div class="page-sub">Trzba, naklady a zisk po dnech</div></div>
+        <button class="btn btn-primary btn-big" onclick="openModal('journalModal')">+ Pridat vydelek</button>
+      </div>
+      <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" id="search-journal" placeholder="Hledat misto, zbozi..." oninput="renderJournal()"></div>
+      <div id="journalList"></div>
+    </div>
+
+    <!-- EVENTS -->
+    <div id="page-events" class="page">
+      <div class="page-header">
+        <div><div class="page-title">📍 Domluvene akce</div><div class="page-sub">Potvrzene akce s datumem a mistem</div></div>
+        <button class="btn btn-primary btn-big" onclick="openModal('eventModal')">+ Pridat akci</button>
+      </div>
+      <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" id="search-events" placeholder="Hledat akci, misto..." oninput="renderEvents()"></div>
+      <div id="eventList"></div>
+    </div>
+
+    <!-- LEADS - Domlouvani akci -->
+    <div id="page-leads" class="page">
+      <div class="page-header">
+        <div><div class="page-title">🤝 Domlouvani akci</div><div class="page-sub">Nove nalezene akce — domlouvas, ceka, zamitla</div></div>
+        <button class="btn btn-primary btn-big" onclick="openModal('leadModal')">+ Pridat akci</button>
+      </div>
+      <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" id="search-leads" placeholder="Hledat akci, misto..." oninput="renderLeads()"></div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" id="lf-all" onclick="filterLeads('all')">Vse</button>
+        <button class="filter-tab" id="lf-new" onclick="filterLeads('new')">🆕 Nova</button>
+        <button class="filter-tab" id="lf-contact" onclick="filterLeads('contact')">📞 Kontaktovano</button>
+        <button class="filter-tab" id="lf-confirmed" onclick="filterLeads('confirmed')">✅ Domluveno</button>
+        <button class="filter-tab" id="lf-rejected" onclick="filterLeads('rejected')">❌ Zamitnuto</button>
+      </div>
+      <div id="leadList"></div>
+    </div>
+
+    <!-- ORGANIZERS -->
+    <div id="page-organizers" class="page">
+      <div class="page-header">
+        <div><div class="page-title">👥 Poradatele</div><div class="page-sub">Spolecny seznam — vidi vsichni</div></div>
+        <button class="btn btn-primary btn-big" onclick="openModal('organizerModal')">+ Pridat poradatele</button>
+      </div>
+      <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" id="search-organizers" placeholder="Hledat jmeno, mesto..." oninput="renderOrganizers()"></div>
+      <div id="organizerList"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- SYNC -->
+<div class="sync-pill" id="syncPill" style="display:none">
+  <div class="sync-dot" id="syncDot"></div>
+  <span id="syncLabel">—</span>
+</div>
+
+<!-- DAY MODAL -->
+<div class="modal-overlay" id="dayModal">
+  <div class="modal">
+    <div class="modal-title" id="dayModalTitle"></div>
+    <div id="dayModalContent"></div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('dayModal')">Zavrit</button></div>
+  </div>
+</div>
+
+<!-- JOURNAL MODAL -->
+<div class="modal-overlay" id="journalModal">
+  <div class="modal">
+    <div class="modal-title">Zaznam vydelku</div>
+    <input type="hidden" id="jEditId">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Datum</label><input type="date" class="form-input" id="jDate"></div>
+      <div class="form-group"><label class="form-label">Misto stanku</label><input type="text" class="form-input" id="jPlace" placeholder="napr. Ostrava"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Trzba (Kc)</label><input type="number" class="form-input" id="jIncome" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">Naklady (Kc)</label><input type="number" class="form-input" id="jCosts" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Co se prodavalo</label><input type="text" class="form-input" id="jGoods" placeholder="napr. 15x plusak, 30x balonek"></div>
+    <div class="form-group"><label class="form-label">Poznamky</label><textarea class="form-textarea" id="jNotes" placeholder="Jak probehl den..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('journalModal')">Zrusit</button>
+      <button class="btn btn-primary" onclick="saveJournal()">Ulozit</button>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT MODAL -->
+<div class="modal-overlay" id="eventModal">
+  <div class="modal">
+    <div class="modal-title">Nova akce</div>
+    <input type="hidden" id="eEditId">
+    <div class="form-group"><label class="form-label">Nazev akce</label><input type="text" class="form-input" id="eName" placeholder="napr. Jarmark Ostrava"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Datum od</label><input type="date" class="form-input" id="eDateFrom"></div>
+      <div class="form-group"><label class="form-label">Datum do</label><input type="date" class="form-input" id="eDateTo"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Misto</label><input type="text" class="form-input" id="ePlace" placeholder="napr. Opava"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Poradatel</label><input type="text" class="form-input" id="eOrganizer" placeholder="Jmeno"></div>
+      <div class="form-group"><label class="form-label">Telefon</label><input type="tel" class="form-input" id="ePhone" placeholder="+420 ..."></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Poplatek (Kc)</label><input type="number" class="form-input" id="eFee" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="eStatus">
+          <option value="confirmed">Potvrzeno</option>
+          <option value="tentative">Predbezne</option>
+          <option value="cancelled">Zruseno</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group"><label class="form-label">Poznamky</label><textarea class="form-textarea" id="eNotes" placeholder="Parkovani, co vzit..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('eventModal')">Zrusit</button>
+      <button class="btn btn-primary" onclick="saveEvent()">Ulozit</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAD MODAL -->
+<div class="modal-overlay" id="leadModal">
+  <div class="modal">
+    <div class="modal-title">Domlouvani akce</div>
+    <input type="hidden" id="lEditId">
+    <div class="form-group"><label class="form-label">Nazev akce</label><input type="text" class="form-input" id="lName" placeholder="napr. Jarmark Brno"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Misto</label><input type="text" class="form-input" id="lPlace" placeholder="napr. Brno"></div>
+      <div class="form-group"><label class="form-label">Predpokladany datum</label><input type="date" class="form-input" id="lDate"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Poradatel / Kontakt</label><input type="text" class="form-input" id="lContact" placeholder="Jmeno"></div>
+      <div class="form-group"><label class="form-label">Telefon / Email</label><input type="text" class="form-input" id="lPhone" placeholder="+420 ..."></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="lStatus">
+          <option value="new">Nova nalezena akce</option>
+          <option value="contact">Kontaktovano, cekam</option>
+          <option value="confirmed">Domluveno</option>
+          <option value="rejected">Zamitnuto / Nezajima</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Odhadovana trzba (Kc)</label><input type="number" class="form-input" id="lEstimate" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Poznamky</label><textarea class="form-textarea" id="lNotes" placeholder="Kde jsem akci nasel, co vim, co jeste domluvit..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('leadModal')">Zrusit</button>
+      <button class="btn btn-primary" onclick="saveLead()">Ulozit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORGANIZER MODAL -->
+<div class="modal-overlay" id="organizerModal">
+  <div class="modal">
+    <div class="modal-title">Poradatel</div>
+    <input type="hidden" id="oEditId">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Jmeno</label><input type="text" class="form-input" id="oName" placeholder="napr. Jan Novak"></div>
+      <div class="form-group"><label class="form-label">Funkce</label><input type="text" class="form-input" id="oRole" placeholder="napr. Starosta"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Mesto</label><input type="text" class="form-input" id="oCity" placeholder="napr. Dolni Benesov"></div>
+      <div class="form-group"><label class="form-label">Nazev akce</label><input type="text" class="form-input" id="oEvent" placeholder="napr. Jarmark"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Telefon</label><input type="tel" class="form-input" id="oPhone" placeholder="+420 ..."></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="oEmail" placeholder="email@example.com"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Poznamky</label><textarea class="form-textarea" id="oNotes" placeholder="Kdy volat, oblibene akce..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('organizerModal')">Zrusit</button>
+      <button class="btn btn-primary" onclick="saveOrganizer()">Ulozit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+var db=null,demoMode=false,currentUser=null,currentUserColor='#e67e22',currentUserName='';
+var data={journals:{},events:{},tasks:{},leads:{}};
+var orgData={};
+var wxCache={};
+var calYear,calMonth,leadFilter='all',currentPage='calendar';
+var now=new Date();calYear=now.getFullYear();calMonth=now.getMonth();
+var MONTHS=['Leden','Unor','Brezen','Duben','Kveten','Cerven','Cervenec','Srpen','Zari','Rijen','Listopad','Prosinec'];
+var DAYS=['Po','Ut','St','Ct','Pa','So','Ne'];
+var USERS={tatka:{name:'Tatka',color:'#e67e22'},david:{name:'David',color:'#2980b9'},pepa:{name:'Pepa',color:'#27ae60'},veronika:{name:'Veronika',color:'#9b59b6'}};
+
+// ── THEME ──
+function toggleTheme(){
+  var t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('stanek_theme',t);
+}
+
+// ── BOOT ──
+window.addEventListener('load',function(){
+  var theme=localStorage.getItem('stanek_theme')||'light';
+  document.documentElement.setAttribute('data-theme',theme);
+  var cfg=localStorage.getItem('stanek_fb');
+  if(cfg){try{initFirebase(JSON.parse(cfg));return;}catch(e){}}
+  document.getElementById('setupScreen').style.display='flex';
+});
+
+// ── SETUP ──
+function saveConfig(){
+  var cfg={apiKey:v('cfg-apiKey'),authDomain:v('cfg-authDomain'),databaseURL:v('cfg-dbUrl'),projectId:v('cfg-projectId')};
+  if(!cfg.apiKey||!cfg.databaseURL){showErr('Vyplnprosim API Key a Database URL.');return;}
+  localStorage.setItem('stanek_fb',JSON.stringify(cfg));initFirebase(cfg);
+}
+function showErr(msg){var e=document.getElementById('setup-error');e.textContent=msg;e.style.display='block';}
+function initFirebase(cfg){
+  try{
+    firebase.initializeApp(cfg);db=firebase.database();
+    sync('pulse','Pripojuji...');
+    db.ref('.info/connected').on('value',function(s){sync(s.val()?'on':'off',s.val()?'Online':'Offline');});
+    document.getElementById('setupScreen').style.display='none';
+    showPicker();
+  }catch(e){showErr('Chyba: '+e.message);}
+}
+function startDemo(){demoMode=true;document.getElementById('setupScreen').style.display='none';showPicker();}
+
+// ── PICKER ──
+function showPicker(){
+  document.getElementById('pickerScreen').style.display='flex';
+  document.getElementById('mainApp').style.display='none';
+  document.getElementById('syncPill').style.display='none';
+}
+function selectUser(id,name,color){
+  if(db&&currentUser){['journals','events','tasks','leads'].forEach(function(k){db.ref(currentUser+'/'+k).off();});db.ref('shared').off();}
+  currentUser=id;currentUserName=name;currentUserColor=color;
+  document.documentElement.style.setProperty('--uc',color);
+  ['userAv','mobileUserAv'].forEach(function(x){var el=document.getElementById(x);if(el){el.style.background=color;el.textContent=name[0];}});
+  ['userPillName','mobileUserName'].forEach(function(x){var el=document.getElementById(x);if(el)el.textContent=name;});
+  document.getElementById('calSub').textContent=name+' — prehled akci a trzeb';
+  document.getElementById('statsSub').textContent=name;
+  document.getElementById('pickerScreen').style.display='none';
+  document.getElementById('mainApp').style.display='flex';
+  document.getElementById('syncPill').style.display='flex';
+  data={journals:{},events:{},tasks:{},leads:{}};orgData={};wxCache={};
+  if(demoMode){loadDemo();refreshPage();}else{listenAll();}
+}
+function switchUser(){showPicker();}
+
+// ── FIREBASE ──
+function listenAll(){
+  ['journals','events','tasks','leads'].forEach(function(key){
+    db.ref(currentUser+'/'+key).on('value',function(snap){data[key]=snap.val()||{};refreshPage();});
+  });
+  db.ref('shared/organizers').on('value',function(snap){orgData=snap.val()||{};if(currentPage==='organizers')renderOrganizers();});
+}
+function fbSet(path,val){
+  if(demoMode){var p=path.split('/');if(p.length===2)data[p[0]][p[1]]=val;refreshPage();return;}
+  db.ref(currentUser+'/'+path).set(val);
+}
+function fbDel(path){
+  if(demoMode){var p=path.split('/');if(p.length===2)delete data[p[0]][p[1]];refreshPage();return;}
+  db.ref(currentUser+'/'+path).remove();
+}
+function fbSetOrg(path,val){
+  if(demoMode){var p=path.split('/');orgData[p[1]]=val;renderOrganizers();return;}
+  db.ref('shared/'+path).set(val);
+}
+function fbDelOrg(path){
+  if(demoMode){var p=path.split('/');delete orgData[p[1]];renderOrganizers();return;}
+  db.ref('shared/'+path).remove();
+}
+function loadDemo(){
+  var y=now.getFullYear(),m=pad(now.getMonth()+1);
+  var d1=y+'-'+m+'-05',d2=y+'-'+m+'-18',d3=y+'-'+m+'-26';
+  data.journals={'j1':{date:d1,place:'Ostrava',income:3200,costs:400,goods:'20x plusak, 15x balonek',notes:'Vyborny den.'}};
+  data.events={
+    'e1':{name:'Jarmark Opava',dateFrom:d2,dateTo:d2,place:'Opava',organizer:'Jana Novakova',phone:'+420 777 111 222',fee:500,status:'confirmed',who:['tatka','david'],notes:'Prijet v 8:00.'},
+    'e2':{name:'Detsky den Ostrava',dateFrom:d3,dateTo:d3,place:'Ostrava',organizer:'Petr Kovar',phone:'+420 604 333 444',fee:0,status:'tentative',who:['pepa'],notes:''}
+  };
+  data.leads={
+    'l1':{name:'Letni trh Hlucin',place:'Hlucin',date:y+'-07-15',contact:'MU Hlucin',phone:'553 123 456',status:'contact',estimate:4000,notes:'Volal jsem, cekam na odpoved'},
+    'l2':{name:'Vanoce Karvina',place:'Karvina',date:y+'-12-05',contact:'',phone:'',status:'new',estimate:6000,notes:'Nasel jsem na fb, jeste nekontaktovano'}
+  };
+  orgData={'o1':{name:'Jana Novakova',event:'Jarmark Opava',city:'Opava',role:'Organizator',phone:'+420 777 111 222',email:'jana@opava.cz',notes:''}};
+}
+
+// ── NAV ──
+function showPage(page,btn){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('page-'+page).classList.add('active');
+  if(btn)btn.classList.add('active');
+  currentPage=page;refreshPage();
+}
+function refreshPage(){
+  if(!currentUser)return;
+  if(currentPage==='stats')renderStats();
+  else if(currentPage==='calendar')renderCalendar();
+  else if(currentPage==='journal')renderJournal();
+  else if(currentPage==='events')renderEvents();
+  else if(currentPage==='leads')renderLeads();
+  else if(currentPage==='organizers')renderOrganizers();
+}
+function openMobileMenu(){document.getElementById('mobileNav').classList.add('open');}
+function closeMobileMenu(){document.getElementById('mobileNav').classList.remove('open');}
+
+// ── STATS ──
+function renderStats(){
+  var yearSel=document.getElementById('statsYear');
+  var years=[];
+  Object.values(data.journals).forEach(function(j){var y=parseInt((j.date||'').split('-')[0]);if(y&&years.indexOf(y)===-1)years.push(y);});
+  if(years.indexOf(now.getFullYear())===-1)years.push(now.getFullYear());
+  years.sort(function(a,b){return b-a;});
+  if(yearSel.options.length===0){years.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent=y;yearSel.appendChild(o);});}
+  var selYear=parseInt(yearSel.value)||now.getFullYear();
+  var entries=Object.values(data.journals).filter(function(j){return parseInt((j.date||'').split('-')[0])===selYear;});
+  var totalIncome=0,totalCosts=0,count=0;
+  var byMonth={},byPlace={};
+  entries.forEach(function(j){
+    totalIncome+=(j.income||0);totalCosts+=(j.costs||0);count++;
+    var m=parseInt((j.date||'').split('-')[1])-1;
+    byMonth[m]=(byMonth[m]||0)+(j.income||0);
+    var pl=(j.place||'').split(',')[0].trim();if(!pl)return;
+    byPlace[pl]=(byPlace[pl]||0)+(j.income||0);
+  });
+  var profit=totalIncome-totalCosts;
+  var avg=count?Math.round(totalIncome/count):0;
+  // stats grid
+  document.getElementById('statsGrid').innerHTML=
+    sc('Celkova trzba','green',totalIncome.toLocaleString('cs')+' Kc')+
+    sc('Celkove naklady','red',totalCosts.toLocaleString('cs')+' Kc')+
+    sc('Celkovy zisk',profit>=0?'green':'red',profit.toLocaleString('cs')+' Kc')+
+    sc('Pocet dni','amber',count)+
+    sc('Prumer / den','amber',avg.toLocaleString('cs')+' Kc')+
+    sc('Pocet akci','amber',Object.values(data.events).length);
+  // month chart
+  var maxM=Math.max.apply(null,Object.values(byMonth).concat([1]));
+  var chartH='';
+  for(var i=0;i<12;i++){
+    var val=byMonth[i]||0;
+    var pct=Math.round(val/maxM*100);
+    chartH+='<div class="bar-row"><div class="bar-label">'+MONTHS[i].substring(0,3)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--green)">'+( val?val.toLocaleString('cs')+' Kc':'')+'</div></div></div>';
+  }
+  document.getElementById('monthChart').innerHTML=chartH||'<div style="color:var(--text3);font-size:13px">Zadne zaznamy</div>';
+  // top places
+  var places=Object.entries(byPlace).filter(function(e){return e[0]&&e[0]!=='Nezname'&&e[0].length>1;}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  document.getElementById('topPlaces').innerHTML=places.length?places.map(function(e,i){return '<div class="top-item"><div class="top-item-name">'+(i+1)+'. '+e[0]+'</div><div class="top-item-val" style="color:var(--green)">'+e[1].toLocaleString('cs')+' Kc</div></div>';}).join(''):'<div style="color:var(--text3);font-size:13px">Zadne zaznamy</div>';
+  // top days
+  var days=Object.values(data.journals).filter(function(j){return parseInt((j.date||'').split('-')[0])===selYear;}).sort(function(a,b){return (b.income||0)-(a.income||0);}).slice(0,5);
+  document.getElementById('topDays').innerHTML=days.length?days.map(function(j,i){return '<div class="top-item"><div class="top-item-name">'+(i+1)+'. '+fmtDate(j.date)+(j.place?' — '+j.place:'')+'</div><div class="top-item-val" style="color:var(--green)">'+(j.income||0).toLocaleString('cs')+' Kc</div></div>';}).join(''):'<div style="color:var(--text3);font-size:13px">Zadne zaznamy</div>';
+}
+function sc(label,cls,val){return '<div class="stat-big"><div class="stat-big-label">'+label+'</div><div class="stat-big-val '+cls+'">'+val+'</div></div>';}
+
+var showAllUsers=false;
+function toggleAllUsers(){
+  showAllUsers=!showAllUsers;
+  document.getElementById('allUsersBtn').style.background=showAllUsers?'var(--uc)':'';
+  document.getElementById('allUsersBtn').style.color=showAllUsers?'#fff':'';
+  document.getElementById('allUsersWrap').style.display=showAllUsers?'block':'none';
+  if(showAllUsers)renderAllUsers();
+}
+function renderAllUsers(){
+  if(!db&&!demoMode){document.getElementById('allUsersChart').innerHTML='<div style="color:var(--text3);font-size:13px">Dostupne jen s Firebase</div>';return;}
+  var selYear=parseInt(document.getElementById('statsYear').value)||now.getFullYear();
+  var users=Object.entries(USERS);
+  var results=[];
+  var loaded=0;
+  function tryRender(){
+    loaded++;
+    if(loaded<users.length)return;
+    var maxVal=Math.max.apply(null,results.map(function(r){return r.income;}).concat([1]));
+    var html='';
+    results.sort(function(a,b){return b.income-a.income;});
+    results.forEach(function(r){
+      var pct=Math.round(r.income/maxVal*100);
+      html+='<div class="bar-row">'
+        +'<div style="display:flex;align-items:center;gap:6px;width:80px;flex-shrink:0">'
+        +'<div style="width:10px;height:10px;border-radius:50%;background:'+r.color+'"></div>'
+        +'<div class="bar-label" style="width:auto">'+r.name+'</div></div>'
+        +'<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+r.color+'">'+(r.income?r.income.toLocaleString('cs')+' Kc':'')+'</div></div>'
+        +'</div>';
+    });
+    document.getElementById('allUsersChart').innerHTML=html||'<div style="color:var(--text3);font-size:13px">Zadne zaznamy</div>';
+  }
+  users.forEach(function(e){
+    var uid=e[0],udata=e[1];
+    if(demoMode){
+      // in demo just show current user data for all
+      var inc=Object.values(data.journals).filter(function(j){return parseInt((j.date||'').split('-')[0])===selYear;}).reduce(function(s,j){return s+(j.income||0);},0);
+      results.push({name:udata.name,color:udata.color,income:uid===currentUser?inc:Math.round(inc*Math.random())});
+      tryRender();
+    } else {
+      db.ref(uid+'/journals').once('value',function(snap){
+        var journals=snap.val()||{};
+        var inc=Object.values(journals).filter(function(j){return parseInt((j.date||'').split('-')[0])===selYear;}).reduce(function(s,j){return s+(j.income||0);},0);
+        results.push({name:udata.name,color:udata.color,income:inc});
+        tryRender();
+      });
+    }
+  });
+}
+
+// ── CALENDAR ──
+function changeMonth(d){calMonth+=d;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
+function renderCalendar(){
+  document.getElementById('calMonthLabel').textContent=MONTHS[calMonth]+' '+calYear;
+  var grid=document.getElementById('calGrid');grid.innerHTML='';
+  DAYS.forEach(function(d){var e=document.createElement('div');e.className='cal-day-name';e.textContent=d;grid.appendChild(e);});
+  var startDow=new Date(calYear,calMonth,1).getDay();if(startDow===0)startDow=7;
+  for(var i=1;i<startDow;i++){var e=document.createElement('div');e.className='cal-day empty';grid.appendChild(e);}
+  var days=new Date(calYear,calMonth+1,0).getDate(),todayStr=dateStr(now);
+  var mIncome=0,mEvents=0,nextEv=null;
+  for(var day=1;day<=days;day++){
+    var ds=calYear+'-'+pad(calMonth+1)+'-'+pad(day);
+    var el=document.createElement('div');el.className='cal-day';
+    if(ds===todayStr)el.classList.add('today');
+    var j=Object.values(data.journals).find(function(x){return x.date===ds;});
+    var evs=Object.values(data.events).filter(function(x){return x.dateFrom<=ds&&(x.dateTo>=ds||x.dateFrom===ds);});
+    if(evs.length){el.classList.add('has-event');mEvents+=evs.length;}
+    if(j){el.classList.add('has-income');mIncome+=(j.income||0);}
+    evs.forEach(function(x){if(x.dateFrom>=todayStr&&(!nextEv||x.dateFrom<nextEv.dateFrom))nextEv=x;});
+    var h='<div class="cal-day-num">'+day+'</div>';
+    evs.forEach(function(x){
+      h+='<div class="cal-dot ev">'+x.name+'</div>';
+      if(x.place)h+='<div class="cal-dot plain">'+x.place.split(',')[0]+'</div>';
+
+    });
+    if(j){
+      h+='<div class="cal-dot inc">'+(j.income||0).toLocaleString('cs')+' Kc</div>';
+      if(j.place)h+='<div class="cal-dot plain" style="font-weight:600;color:#444">'+j.place.split(',')[0]+'</div>';
+    }
+    el.innerHTML=h;
+    (function(d2,dy){el.onclick=function(){openDayModal(d2,dy);};})(ds,day);
+    grid.appendChild(el);
+  }
+  document.getElementById('statEvents').textContent=mEvents;
+  document.getElementById('statIncome').textContent=mIncome.toLocaleString('cs')+' Kc';
+  document.getElementById('statNext').textContent=nextEv?nextEv.name+' ('+fmtDate(nextEv.dateFrom)+')':'—';
+
+}
+function openDayModal(ds,day){
+  document.getElementById('dayModalTitle').textContent=day+'. '+MONTHS[calMonth]+' '+calYear;
+  var j=Object.values(data.journals).find(function(x){return x.date===ds;});
+  var jid=j?Object.keys(data.journals).find(function(k){return data.journals[k]===j;}):null;
+  var evs=Object.values(data.events).filter(function(x){return x.dateFrom<=ds&&(x.dateTo>=ds||x.dateFrom===ds);});
+  var h='';
+  evs.forEach(function(x){
+    var eid=Object.keys(data.events).find(function(k){return data.events[k]===x;});
+    var sb=x.status==='confirmed'?'badge-green':x.status==='cancelled'?'badge-red':'badge-amber';
+    var sl=x.status==='confirmed'?'Potvrzeno':x.status==='cancelled'?'Zruseno':'Predbezne';
+    h+='<div class="item-card" style="margin-bottom:10px">'
+      +'<div class="item-card-header"><div class="item-card-title">'+x.name+' <span class="badge '+sb+'">'+sl+'</span></div>'
+      +'<div class="item-card-actions"><button class="btn btn-ghost btn-sm" id="dme-'+eid+'">Upravit</button><button class="btn btn-danger btn-sm" id="dmd-'+eid+'">Smazat</button></div></div>'
+      +'<div class="item-meta">'
+      +(x.place?'<div class="item-tag">📍 '+x.place+'</div>':'')
+      +(x.phone?'<div class="item-tag">📞 <a href="tel:'+x.phone+'" style="color:var(--uc)">'+x.phone+'</a></div>':'')
+      
+      +'</div>'
+      +(x.notes?'<div class="item-note">'+x.notes+'</div>':'')
+      +'</div>';
+  });
+  if(j){
+    var profit=(j.income||0)-(j.costs||0);
+    h+='<div class="item-card" style="margin-bottom:10px">'
+      +'<div class="item-card-header"><div class="item-card-title">Vydelek</div>'
+      +'<div class="item-card-actions"><button class="btn btn-ghost btn-sm" id="dmje-'+jid+'">Upravit</button><button class="btn btn-danger btn-sm" id="dmjd-'+jid+'">Smazat</button></div></div>'
+      +'<div class="item-meta">'
+      +'<div class="item-tag" style="font-weight:700;color:var(--green)">Trzba: '+(j.income||0).toLocaleString('cs')+' Kc</div>'
+      +'<div class="item-tag" style="font-weight:700;color:var(--red)">Naklady: '+(j.costs||0).toLocaleString('cs')+' Kc</div>'
+      +'<div class="item-tag" style="font-weight:700;color:'+(profit>=0?'var(--green)':'var(--red)')+'">Zisk: '+profit.toLocaleString('cs')+' Kc</div>'
+      +(j.goods?'<div class="item-tag">'+j.goods+'</div>':'')
+      +'</div>'
+      +(j.notes?'<div class="item-note">'+j.notes+'</div>':'')
+      +'</div>';
+  }
+  if(!evs.length&&!j)h='<div class="empty"><div class="empty-icon">📅</div><div class="empty-text">Zadne zaznamy pro tento den.</div></div>';
+  h+='<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">'
+    +'<button class="btn btn-ghost btn-sm" onclick="closeModal(\'dayModal\');setDateAndOpen(\''+ds+'\',\'journalModal\',\'jDate\')">+ Vydelek</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="closeModal(\'dayModal\');setDateAndOpen(\''+ds+'\',\'eventModal\',\'eDateFrom\')">+ Akce</button>'
+    +'</div>';
+  document.getElementById('dayModalContent').innerHTML=h;
+  evs.forEach(function(x){
+    var eid=Object.keys(data.events).find(function(k){return data.events[k]===x;});
+    var eb=document.getElementById('dme-'+eid),db2=document.getElementById('dmd-'+eid);
+    if(eb)eb.onclick=function(){closeModal('dayModal');editEvent(eid);};
+    if(db2)db2.onclick=function(){if(confirm('Smazat akci?')){fbDel('events/'+eid);closeModal('dayModal');}};
+  });
+  if(j){
+    var jeb=document.getElementById('dmje-'+jid),jdb=document.getElementById('dmjd-'+jid);
+    if(jeb)jeb.onclick=function(){closeModal('dayModal');editJournal(jid);};
+    if(jdb)jdb.onclick=function(){if(confirm('Smazat vydelek?')){fbDel('journals/'+jid);closeModal('dayModal');}};
+  }
+  openModal('dayModal');
+}
+function setDateAndOpen(ds,modal,field){
+  document.getElementById(field).value=ds;
+  // if opening journal modal, auto-fill place from event on that day
+  if(modal==='journalModal'){
+    var ev=Object.values(data.events).find(function(x){return x.dateFrom<=ds&&(x.dateTo>=ds||x.dateFrom===ds);});
+    if(ev&&ev.place&&!document.getElementById('jPlace').value){
+      document.getElementById('jPlace').value=ev.place;
+    }
+  }
+  openModal(modal);
+}
+
+// ── JOURNAL ──
+function renderJournal(){
+  var list=document.getElementById('journalList');
+  var sq=(document.getElementById('search-journal')||{value:''}).value.toLowerCase();
+  var entries=Object.entries(data.journals).sort(function(a,b){return b[1].date.localeCompare(a[1].date);});
+  if(sq)entries=entries.filter(function(e){var j=e[1];return (j.place||'').toLowerCase().includes(sq)||(j.goods||'').toLowerCase().includes(sq)||(j.notes||'').toLowerCase().includes(sq);});
+  if(!entries.length){list.innerHTML=empty('📖',sq?'Nic nenalezeno.':'Zadne zaznamy. Klikni na + Pridat vydelek.');return;}
+  list.innerHTML='';
+  entries.forEach(function(e){
+    var id=e[0],j=e[1],profit=(j.income||0)-(j.costs||0);
+    var card=document.createElement('div');card.className='item-card';
+    card.innerHTML='<div class="item-card-header"><div><div class="item-card-title">'+fmtDate(j.date)+(j.place?' — '+j.place:'')+'</div></div>'
+      +'<div class="item-card-actions"><button class="btn btn-ghost btn-sm" id="je-'+id+'">Upravit</button><button class="btn btn-danger btn-sm" id="jd-'+id+'">Smazat</button></div></div>'
+      +'<div class="item-meta">'
+      +'<div class="item-tag" style="font-weight:700;color:var(--green)">Trzba: '+(j.income||0).toLocaleString('cs')+' Kc</div>'
+      +'<div class="item-tag" style="font-weight:700;color:var(--red)">Naklady: '+(j.costs||0).toLocaleString('cs')+' Kc</div>'
+      +'<div class="item-tag" style="font-weight:700;color:'+(profit>=0?'var(--green)':'var(--red)')+'">Zisk: '+profit.toLocaleString('cs')+' Kc</div>'
+      +(j.goods?'<div class="item-tag">'+j.goods+'</div>':'')
+      +'</div>'
+      +(j.notes?'<div class="item-note">'+j.notes+'</div>':'');
+    list.appendChild(card);
+    card.querySelector('#je-'+id).onclick=function(){editJournal(id);};
+    card.querySelector('#jd-'+id).onclick=function(){if(confirm('Smazat?'))fbDel('journals/'+id);};
+  });
+}
+function saveJournal(){
+  var id=v('jEditId')||'j'+Date.now(),date=v('jDate');
+  if(!date)return alert('Vyplnprosim datum');
+  fbSet('journals/'+id,{date:date,place:v('jPlace'),income:num('jIncome'),costs:num('jCosts'),goods:v('jGoods'),notes:v('jNotes')});
+  closeModal('journalModal');clearFields(['jEditId','jDate','jPlace','jIncome','jCosts','jGoods','jNotes']);
+}
+function editJournal(id){
+  var j=data.journals[id];if(!j)return;
+  setFields({jEditId:id,jDate:j.date,jPlace:j.place,jIncome:j.income,jCosts:j.costs,jGoods:j.goods,jNotes:j.notes});
+  openModal('journalModal');
+}
+
+// ── EVENTS ──
+function renderEvents(){
+  var list=document.getElementById('eventList');
+  var sq=(document.getElementById('search-events')||{value:''}).value.toLowerCase();
+  var entries=Object.entries(data.events).sort(function(a,b){return a[1].dateFrom.localeCompare(b[1].dateFrom);});
+  if(sq)entries=entries.filter(function(e){var x=e[1];return (x.name||'').toLowerCase().includes(sq)||(x.place||'').toLowerCase().includes(sq)||(x.organizer||'').toLowerCase().includes(sq);});
+  if(!entries.length){list.innerHTML=empty('📍',sq?'Nic nenalezeno.':'Zadne akce.');return;}
+  var sb={confirmed:'<span class="badge badge-green">Potvrzeno</span>',tentative:'<span class="badge badge-amber">Predbezne</span>',cancelled:'<span class="badge badge-red">Zruseno</span>'};
+  list.innerHTML='';
+  entries.forEach(function(e){
+    var id=e[0],ev=e[1],diff=daysDiff(ev.dateFrom);
+    var card=document.createElement('div');card.className='item-card';
+    var wxId='wx-'+id;
+    card.innerHTML='<div class="item-card-header"><div><div class="item-card-title">'+ev.name+' '+(sb[ev.status]||'')+'</div></div>'
+      +'<div class="item-card-actions"><button class="btn btn-ghost btn-sm" id="ee-'+id+'">Upravit</button><button class="btn btn-danger btn-sm" id="ed-'+id+'">Smazat</button></div></div>'
+      +'<div class="item-meta">'
+      +(ev.dateFrom?'<div class="item-tag">📅 '+fmtDate(ev.dateFrom)+(ev.dateTo&&ev.dateTo!==ev.dateFrom?' – '+fmtDate(ev.dateTo):'')+'</div>':'')
+      +(ev.place?'<div class="item-tag">📍 '+ev.place+'</div>':'')
+      +(ev.organizer?'<div class="item-tag">👤 '+ev.organizer+'</div>':'')
+      +(ev.phone?'<div class="item-tag">📞 <a href="tel:'+ev.phone+'" style="color:var(--uc);font-weight:700">'+ev.phone+'</a></div>':'')
+      +(ev.fee?'<div class="item-tag">Poplatek: '+ev.fee.toLocaleString('cs')+' Kc</div>':'')
+      
+      +'</div>'
+      +(ev.place&&diff>=0&&diff<=15?'<div id="'+wxId+'" class="wx-loading">Nacitam pocasi...</div>':'')
+      +(ev.notes?'<div class="item-note">'+ev.notes+'</div>':'');
+    list.appendChild(card);
+    card.querySelector('#ee-'+id).onclick=function(){editEvent(id);};
+    card.querySelector('#ed-'+id).onclick=function(){if(confirm('Smazat akci?'))fbDel('events/'+id);};
+    if(ev.place&&diff>=0&&diff<=15)loadWeather(id,ev.place,ev.dateFrom);
+  });
+}
+function saveEvent(){
+  var id=v('eEditId')||'e'+Date.now(),name=v('eName');
+  if(!name)return alert('Vyplnprosim nazev');
+  fbSet('events/'+id,{name:name,dateFrom:v('eDateFrom'),dateTo:v('eDateTo'),place:v('ePlace'),organizer:v('eOrganizer'),phone:v('ePhone'),fee:num('eFee'),status:v('eStatus'),notes:v('eNotes')});
+  closeModal('eventModal');clearFields(['eEditId','eName','eDateFrom','eDateTo','ePlace','eOrganizer','ePhone','eFee','eNotes']);
+}
+function editEvent(id){
+  var e=data.events[id];if(!e)return;
+  setFields({eEditId:id,eName:e.name,eDateFrom:e.dateFrom,eDateTo:e.dateTo,ePlace:e.place,eOrganizer:e.organizer,ePhone:e.phone,eFee:e.fee,eStatus:e.status,eNotes:e.notes});
+
+  openModal('eventModal');
+}
+
+// ── LEADS ──
+function filterLeads(f){
+  leadFilter=f;
+  ['all','new','contact','confirmed','rejected'].forEach(function(x){
+    var b=document.getElementById('lf-'+x);if(b){b.classList.toggle('active',x===f);}
+  });
+  renderLeads();
+}
+var LEAD_STATUS={new:{label:'Nova akce',cls:'badge-blue'},contact:{label:'Kontaktovano',cls:'badge-amber'},confirmed:{label:'Domluveno',cls:'badge-green'},rejected:{label:'Zamitnuto',cls:'badge-red'}};
+function renderLeads(){
+  var list=document.getElementById('leadList');
+  var sq=(document.getElementById('search-leads')||{value:''}).value.toLowerCase();
+  var entries=Object.entries(data.leads||{}).sort(function(a,b){return (a[1].date||'').localeCompare(b[1].date||'');});
+  if(leadFilter!=='all')entries=entries.filter(function(e){return e[1].status===leadFilter;});
+  if(sq)entries=entries.filter(function(e){var l=e[1];return (l.name||'').toLowerCase().includes(sq)||(l.place||'').toLowerCase().includes(sq)||(l.contact||'').toLowerCase().includes(sq);});
+  if(!entries.length){list.innerHTML=empty('🤝',sq?'Nic nenalezeno.':'Zadne akce k domlouvani.');return;}
+  list.innerHTML='';
+  entries.forEach(function(e){
+    var id=e[0],l=e[1];
+    var st=LEAD_STATUS[l.status]||LEAD_STATUS.new;
+    var card=document.createElement('div');card.className='task-card';
+    card.innerHTML='<div class="prio-dot" style="background:'+(l.status==='confirmed'?'var(--green)':l.status==='rejected'?'var(--red)':l.status==='contact'?'var(--amber)':'#2980b9')+';margin-top:4px"></div>'
+      +'<div class="task-body">'
+      +'<div class="task-text">'+l.name+' <span class="badge '+st.cls+'">'+st.label+'</span></div>'
+      +'<div class="item-meta" style="margin-top:8px">'
+      +(l.place?'<div class="item-tag">📍 '+l.place+'</div>':'')
+      +(l.date?'<div class="item-tag">📅 '+fmtDate(l.date)+'</div>':'')
+      +(l.contact?'<div class="item-tag">👤 '+l.contact+'</div>':'')
+      +(l.phone?'<div class="item-tag">📞 <a href="tel:'+l.phone+'" style="color:var(--uc)">'+l.phone+'</a></div>':'')
+      +(l.estimate?'<div class="item-tag">Odhad: '+l.estimate.toLocaleString('cs')+' Kc</div>':'')
+      +'</div>'
+      +(l.notes?'<div class="item-note">'+l.notes+'</div>':'')
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">'
+      +'<button class="btn btn-ghost btn-sm" id="le-'+id+'">Upravit</button>'
+      +'<button class="btn btn-danger btn-sm" id="ld-'+id+'">Smazat</button>'
+      +'</div>';
+    list.appendChild(card);
+    card.querySelector('#le-'+id).onclick=function(){editLead(id);};
+    card.querySelector('#ld-'+id).onclick=function(){if(confirm('Smazat?'))fbDel('leads/'+id);};
+  });
+}
+function saveLead(){
+  var id=v('lEditId')||'l'+Date.now(),name=v('lName');
+  if(!name)return alert('Vyplnprosim nazev');
+  fbSet('leads/'+id,{name:name,place:v('lPlace'),date:v('lDate'),contact:v('lContact'),phone:v('lPhone'),status:v('lStatus'),estimate:num('lEstimate'),notes:v('lNotes')});
+  closeModal('leadModal');clearFields(['lEditId','lName','lPlace','lDate','lContact','lPhone','lEstimate','lNotes']);
+}
+function editLead(id){
+  var l=data.leads[id];if(!l)return;
+  setFields({lEditId:id,lName:l.name,lPlace:l.place,lDate:l.date,lContact:l.contact,lPhone:l.phone,lStatus:l.status,lEstimate:l.estimate,lNotes:l.notes});
+  openModal('leadModal');
+}
+
+// ── ORGANIZERS ──
+function renderOrganizers(){
+  var list=document.getElementById('organizerList');if(!list)return;
+  var sq=(document.getElementById('search-organizers')||{value:''}).value.toLowerCase();
+  var entries=Object.entries(orgData).sort(function(a,b){return (a[1].name||'').localeCompare(b[1].name||'');});
+  if(sq)entries=entries.filter(function(e){var o=e[1];return (o.name||'').toLowerCase().includes(sq)||(o.city||'').toLowerCase().includes(sq)||(o.event||'').toLowerCase().includes(sq)||(o.phone||'').includes(sq);});
+  if(!entries.length){list.innerHTML=empty('👥',sq?'Nic nenalezeno.':'Zadni poradatele.');return;}
+  list.innerHTML='';
+  entries.forEach(function(e){
+    var id=e[0],o=e[1];
+    var initials=(o.name||'?').split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();
+    var card=document.createElement('div');card.className='item-card';
+    card.innerHTML='<div class="item-card-header"><div style="display:flex;align-items:center;gap:12px">'
+      +'<div style="width:48px;height:48px;border-radius:50%;background:var(--uc);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0">'+initials+'</div>'
+      +'<div><div class="item-card-title">'+o.name+'</div>'+(o.role||o.city?'<div style="font-size:13px;color:var(--text2);margin-top:2px">'+(o.role||'')+(o.city?' &bull; '+o.city:'')+'</div>':'')+'</div>'
+      +'</div><div class="item-card-actions"><button class="btn btn-ghost btn-sm" id="oe-'+id+'">Upravit</button><button class="btn btn-danger btn-sm" id="od-'+id+'">Smazat</button></div></div>'
+      +'<div class="item-meta" style="margin-top:10px">'
+      +(o.event?'<div class="item-tag">🏛 '+o.event+'</div>':'')
+      +(o.phone?'<div class="item-tag">📞 <a href="tel:'+o.phone+'" style="color:var(--uc);font-weight:700;font-size:14px">'+o.phone+'</a></div>':'')
+      +(o.email?'<div class="item-tag">✉️ <a href="mailto:'+o.email+'" style="color:var(--uc)">'+o.email+'</a></div>':'')
+      +'</div>'
+      +(o.notes?'<div class="item-note">'+o.notes+'</div>':'');
+    list.appendChild(card);
+    card.querySelector('#oe-'+id).onclick=function(){editOrganizer(id);};
+    card.querySelector('#od-'+id).onclick=function(){if(confirm('Smazat?'))fbDelOrg('organizers/'+id);};
+  });
+}
+function saveOrganizer(){
+  var id=v('oEditId')||'o'+Date.now(),name=v('oName');
+  if(!name)return alert('Vyplnprosim jmeno');
+  fbSetOrg('organizers/'+id,{name:name,event:v('oEvent'),city:v('oCity'),role:v('oRole'),phone:v('oPhone'),email:v('oEmail'),notes:v('oNotes')});
+  closeModal('organizerModal');clearFields(['oEditId','oName','oEvent','oCity','oRole','oPhone','oEmail','oNotes']);
+}
+function editOrganizer(id){
+  var o=orgData[id];if(!o)return;
+  setFields({oEditId:id,oName:o.name,oEvent:o.event,oCity:o.city,oRole:o.role,oPhone:o.phone,oEmail:o.email,oNotes:o.notes});
+  openModal('organizerModal');
+}
+
+// ── WEATHER ──
+function daysDiff(dateStr){
+  if(!dateStr)return 9999;
+  var t=new Date();t.setHours(0,0,0,0);
+  var d=new Date(dateStr);d.setHours(0,0,0,0);
+  return Math.round((d-t)/86400000);
+}
+function wxIcon(c){if(c===0)return'☀️';if(c<=2)return'⛅';if(c===3)return'☁️';if(c<=49)return'🌫️';if(c<=59)return'🌦️';if(c<=69)return'🌧️';if(c<=79)return'🌨️';if(c<=82)return'🌧️';if(c<=86)return'❄️';return'⛈️';}
+function wxDesc(c){if(c===0)return'Jasno';if(c<=2)return'Polojasno';if(c===3)return'Zatazeno';if(c<=49)return'Mlha';if(c<=59)return'Mrholeni';if(c<=69)return'Dest';if(c<=79)return'Snih';if(c<=82)return'Dest';if(c<=86)return'Snih';return'Bourka';}
+function loadWeather(id,place,dateStr){
+  var el=document.getElementById('wx-'+id);if(!el)return;
+  var city=place.split(',')[0].trim();
+  var key=city+'|'+dateStr;
+  if(wxCache[key]){showWeather(el,wxCache[key]);return;}
+  fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(city)+'&count=1&language=cs&format=json')
+    .then(function(r){return r.json();})
+    .then(function(geo){
+      if(!geo.results||!geo.results.length){el.innerHTML='<span style="font-size:12px;color:var(--text3)">Mesto nenalezeno</span>';return;}
+      var lat=geo.results[0].latitude,lon=geo.results[0].longitude,cn=geo.results[0].name;
+      return fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max&timezone=Europe%2FPrague&forecast_days=16')
+        .then(function(r){return r.json();})
+        .then(function(wx){
+          var i=wx.daily.time.indexOf(dateStr);
+          if(i===-1){el.innerHTML='<span style="font-size:12px;color:var(--text3)">Data nedostupna</span>';return;}
+          var w={city:cn,c:wx.daily.weathercode[i],tmax:Math.round(wx.daily.temperature_2m_max[i]),tmin:Math.round(wx.daily.temperature_2m_min[i]),rain:wx.daily.precipitation_probability_max[i]||0,wind:Math.round(wx.daily.windspeed_10m_max[i])};
+          wxCache[key]=w;showWeather(el,w);
+        });
+    })
+    .catch(function(){el.innerHTML='<span style="font-size:12px;color:var(--text3)">Pocasi nedostupne</span>';});
+}
+function showWeather(el,w){
+  var warn='';
+  if(w.rain>60)warn+='<div class="wx-warn">⚠️ Mozny dest! Vezmi strechu.</div>';
+  if(w.wind>40)warn+='<div class="wx-warn">⚠️ Silny vitr ('+w.wind+' km/h)!</div>';
+  el.className='wx-block';
+  el.innerHTML='<div class="wx-icon">'+wxIcon(w.c)+'</div><div><div class="wx-desc">'+wxDesc(w.c)+' v '+w.city+'</div><div class="wx-detail">🌡️ '+w.tmin+'° – '+w.tmax+'°C &nbsp; 🌧️ dest '+w.rain+'% &nbsp; 💨 vitr '+w.wind+' km/h</div>'+warn+'</div>';
+}
+
+// ── UTILS ──
+function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
+function num(id){return parseFloat(document.getElementById(id).value)||0;}
+function pad(n){return String(n).padStart(2,'0');}
+function dateStr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function fmtDate(s){if(!s)return'';var p=s.split('-');return parseInt(p[2])+'. '+parseInt(p[1])+'. '+p[0];}
+function empty(icon,txt){return '<div class="empty"><div class="empty-icon">'+icon+'</div><div class="empty-text">'+txt+'</div></div>';}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function clearFields(ids){ids.forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});}
+function setFields(obj){Object.keys(obj).forEach(function(k){var el=document.getElementById(k);if(el)el.value=obj[k]||'';});}
+function sync(cls,lbl){var d=document.getElementById('syncDot');d.className='sync-dot';if(cls==='on')d.classList.add('on');if(cls==='pulse')d.classList.add('pulse');document.getElementById('syncLabel').textContent=lbl;}
+document.querySelectorAll('.modal-overlay').forEach(function(o){o.addEventListener('click',function(e){if(e.target===o)o.classList.remove('open');});});
+</script>
+</body>
+</html>
